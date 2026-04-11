@@ -3,30 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Countdown Widget</title>
-    <!-- Importando fonte Inter para um visual moderno similar ao Notion -->
+    <title>Notion Countdown Widget</title>
+    <!-- Fonte Inter para consistência com a UI do Notion -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <!-- Biblioteca de Confetes (CDN robusto) -->
+    <!-- Biblioteca de Confetes -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
     <style>
         :root {
+            /* Cores padrão Notion Light */
             --bg-color: #ffffff;
             --text-color: #37352f;
             --accent-color: #2383e2;
             --subtle-text: #787774;
-            --card-bg: #f7f6f3;
         }
 
-        /* Suporte ao Modo Escuro do Sistema */
         @media (prefers-color-scheme: dark) {
             :root {
+                /* Cores padrão Notion Dark */
                 --bg-color: #191919;
                 --text-color: #ffffff;
                 --accent-color: #2eaadc;
                 --subtle-text: #9b9b9b;
-                --card-bg: #202020;
             }
         }
 
@@ -37,19 +36,18 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background-color: transparent;
+            background-color: var(--bg-color);
             font-family: 'Inter', sans-serif;
             overflow: hidden;
-            background-color: var(--bg-color);
+            transition: background-color 0.3s ease;
         }
 
         .container {
             text-align: center;
             padding: 20px;
             background-color: var(--bg-color);
-            border-radius: 12px;
             width: 100%;
-            max-width: 300px;
+            max-width: 320px;
             user-select: none;
         }
 
@@ -67,14 +65,20 @@
             flex-direction: column;
             align-items: center;
             cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .days-wrapper:active {
+            transform: scale(0.95);
         }
 
         .number {
-            font-size: 64px;
+            font-size: 72px;
             font-weight: 800;
             color: var(--text-color);
             line-height: 1;
             margin: 0;
+            letter-spacing: -0.02em;
         }
 
         .label {
@@ -95,14 +99,15 @@
             100% { transform: scale(1); }
         }
 
+        /* Botão de configuração discreto */
         #settings-link {
             position: fixed;
-            bottom: 10px;
-            right: 10px;
-            font-size: 10px;
+            bottom: 12px;
+            right: 12px;
+            font-size: 12px;
             color: var(--subtle-text);
             text-decoration: none;
-            opacity: 0.2;
+            opacity: 0.15;
             transition: opacity 0.2s;
         }
         #settings-link:hover { opacity: 1; }
@@ -110,111 +115,110 @@
 </head>
 <body>
 
-    <div class="container" id="widget-container">
-        <div class="title" id="display-title">Carregando...</div>
-        <div class="days-wrapper" onclick="launchConfetti()">
+    <div class="container">
+        <div class="title" id="display-title">A carregar...</div>
+        <div class="days-wrapper" id="click-area" title="Clique para testar os confetes!">
             <div id="days-count" class="number">0</div>
             <div id="days-label" class="label">dias</div>
         </div>
     </div>
 
-    <a href="#" id="settings-link" onclick="updateParams()">⚙️ Configurar</a>
 
     <script>
+        // Variável global para controlar disparos de confete
         window.confettiFired = false;
 
-        // VALORES PADRÕES (Caso a URL esteja vazia)
-        const DEFAULT_DATE = "2025-12-31"; 
-        const DEFAULT_TITLE = "Faltam";
+        // Configurações padrão caso não existam parâmetros na URL
+        const DEFAULTS = {
+            date: "2025-12-31",
+            title: "Faltam",
+            subtitle: "Dias"
+        };
 
-        function getQueryParams() {
+        function getParams() {
             const params = new URLSearchParams(window.location.search);
             return {
-                targetDate: params.get('date') || DEFAULT_DATE,
-                title: params.get('title') || DEFAULT_TITLE
+                date: params.get('date') || DEFAULTS.date,
+                title: params.get('title') || DEFAULTS.title,
+                subtitle: params.get('subtitle') || DEFAULTS.title
             };
         }
 
-        function launchConfetti() {
+        function fireConfetti() {
             if (typeof confetti !== 'function') return;
+            
+            const count = 200;
+            const defaults = {
+                origin: { y: 0.7 },
+                colors: ['#2383e2', '#2eaadc', '#ffffff', '#FFD700']
+            };
 
-            const duration = 3 * 1000;
-            const end = Date.now() + duration;
-
-            (function frame() {
+            function fire(particleRatio, opts) {
                 confetti({
-                    particleCount: 5,
-                    angle: 60,
-                    spread: 55,
-                    origin: { x: 0, y: 0.8 },
-                    colors: ['#2383e2', '#2eaadc', '#ffffff', '#ffcc00']
+                    ...defaults,
+                    ...opts,
+                    particleCount: Math.floor(count * particleRatio)
                 });
-                confetti({
-                    particleCount: 5,
-                    angle: 120,
-                    spread: 55,
-                    origin: { x: 1, y: 0.8 },
-                    colors: ['#2383e2', '#2eaadc', '#ffffff', '#ffcc00']
-                });
+            }
 
-                if (Date.now() < end) {
-                    requestAnimationFrame(frame);
-                }
-            }());
+            fire(0.25, { spread: 26, startVelocity: 55 });
+            fire(0.2, { spread: 60 });
+            fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+            fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+            fire(0.1, { spread: 120, startVelocity: 45 });
         }
 
-        function updateCountdown() {
-            const config = getQueryParams();
+        function updateWidget() {
+            const { date, title, subtitle } = getParams();
             const titleEl = document.getElementById('display-title');
-            const daysEl = document.getElementById('days-count');
+            const countEl = document.getElementById('days-count');
             const labelEl = document.getElementById('days-label');
+
+            titleEl.innerText = decodeURIComponent(title);
+
+            // Lógica de tratamento de data local (AAAA-MM-DD)
+            const parts = date.split('-');
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10);
+            const day = parseInt(parts[2], 10);
             
-            titleEl.innerText = decodeURIComponent(config.title);
+            // Criamos a data usando o construtor local (mês é 0-indexado)
+            const target = new Date(year, month - 1, day);
+            target.setHours(0, 0, 0, 0);
 
-            // Ajuste de fuso horário: Tratando a data como local para evitar erro de 1 dia
-            // Dividimos a string e criamos o objeto Date localmente
-            const parts = config.targetDate.split('-');
-            const targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
-            
-            // Data atual com hora zerada para comparação justa de dias
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            targetDate.setHours(0, 0, 0, 0);
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
 
-            const diffTime = targetDate - today;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            // Diferença em milissegundos convertida para dias
+            const diffInMs = target - now;
+            const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24));
 
-            if (diffDays <= 0) {
-                daysEl.innerText = "0";
-                labelEl.innerText = "Chegou o dia! 🎉";
-                daysEl.classList.add('target-reached');
+            if (diffInDays <= 0) {
+                countEl.innerText = "0";
+                labelEl.innerText = subtitle;
+                countEl.classList.add('target-reached');
                 
+                // Dispara confete apenas uma vez ao carregar se já for o dia
                 if (!window.confettiFired) {
-                    launchConfetti();
+                    fireConfetti();
                     window.confettiFired = true;
                 }
             } else {
-                daysEl.innerText = diffDays;
-                labelEl.innerText = diffDays === 1 ? "dia restante" : "dias restantes";
-                daysEl.classList.remove('target-reached');
+                countEl.innerText = diffInDays;
+                labelEl.innerText = diffInDays === 1 ? "dia restante" : "dias restantes";
+                countEl.classList.remove('target-reached');
                 window.confettiFired = false;
             }
         }
 
-        function updateParams() {
-            const date = prompt("Data (AAAA-MM-DD):", DEFAULT_DATE);
-            const title = prompt("Título:", DEFAULT_TITLE);
-            if (date) {
-                const url = new URL(window.location.href);
-                url.searchParams.set('date', date);
-                url.searchParams.set('title', title || DEFAULT_TITLE);
-                window.location.href = url.toString();
-            }
-        }
+
+        // Permitir disparo manual de confetes ao clicar na área central
+        document.getElementById('click-area').addEventListener('click', fireConfetti);
 
         window.onload = () => {
-            setTimeout(updateCountdown, 100);
-            setInterval(updateCountdown, 3600000); // Atualiza a cada hora
+            updateWidget();
+            // Atualiza a cada hora para garantir que a virada do dia seja capturada
+            setInterval(updateWidget, 3600000);
         };
     </script>
 </body>
