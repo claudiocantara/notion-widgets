@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion Event Calendar</title>
+    <!-- Fonte Inter para consistência com a UI do Notion -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Tema Claro */
+            --bg-color: #ffffff;
+            --text-color: #37352f;
+            --text-muted: #787774;
+            --border-color: #e9e9e7;
+            --accent-main: #2383e2;
+            --accent-light: rgba(35, 131, 226, 0.15);
+            --accent-text: #ffffff;
+            --hover-bg: #f1f1f0;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                /* Tema Escuro */
+                --bg-color: #191919;
+                --text-color: #ffffff;
+                --text-muted: #9b9b9b;
+                --border-color: #333333;
+                --accent-main: #2eaadc;
+                --accent-light: rgba(46, 170, 220, 0.25);
+                --accent-text: #ffffff;
+                --hover-bg: #2c2c2c;
+            }
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: var(--bg-color);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .calendar-container {
+            width: 100%;
+            max-width: 340px;
+            padding: 20px;
+            background: var(--bg-color);
+            user-select: none;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .event-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .controls button {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .controls button:hover {
+            background: var(--hover-bg);
+            color: var(--text-color);
+        }
+
+        .month-year {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px 0;
+            text-align: center;
+        }
+
+        .weekday {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .day-wrapper {
+            position: relative;
+            height: 36px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 2px 0;
+        }
+
+        .day {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            font-size: 14px;
+            z-index: 2;
+            transition: background 0.2s;
+        }
+
+        .day.empty {
+            visibility: hidden;
+        }
+
+        /* Lógica visual do intervalo de datas */
+        .range-mid {
+            background-color: var(--accent-light);
+        }
+
+        .range-start, .range-end {
+            background-color: var(--accent-light);
+        }
+
+        .range-start {
+            border-top-left-radius: 18px;
+            border-bottom-left-radius: 18px;
+        }
+
+        .range-end {
+            border-top-right-radius: 18px;
+            border-bottom-right-radius: 18px;
+        }
+
+        .range-single {
+            border-radius: 18px;
+            background-color: transparent;
+        }
+
+        /* O círculo do dia em si */
+        .day.start-date, .day.end-date, .day.single-date {
+            background-color: var(--accent-main);
+            color: var(--accent-text);
+            font-weight: 600;
+        }
+
+        /* Para evitar que a cor de fundo invada os domingos ou sábados se não for preciso, mas no grid CSS puro fica bom assim */
+
+        #settings-link {
+            position: fixed;
+            bottom: 12px;
+            right: 12px;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-decoration: none;
+            opacity: 0.15;
+            transition: opacity 0.2s;
+        }
+        #settings-link:hover { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="calendar-container">
+        <div class="header">
+            <div class="event-title" id="event-title">Viagem</div>
+        </div>
+        
+        <div class="controls">
+            <button id="prev-btn">&lt;</button>
+            <div class="month-year" id="month-year">...</div>
+            <button id="next-btn">&gt;</button>
+        </div>
+
+        <div class="calendar-grid" id="calendar-grid">
+            <!-- Os dias da semana e os números serão injetados via JS -->
+        </div>
+    </div>
+
+    <a href="#" id="settings-link" onclick="updateParams()">⚙️ Configurar</a>
+
+    <script>
+        const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+        const weekdays = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+        let currentDate = new Date();
+        let currentDisplayedMonth = currentDate.getMonth();
+        let currentDisplayedYear = currentDate.getFullYear();
+
+        // Parâmetros padrão
+        const DEFAULTS = {
+            title: "Férias de Verão",
+            start: "2026-07-15",
+            end: "2026-07-25"
+        };
+
+        function getParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                title: params.get('title') || DEFAULTS.title,
+                start: params.get('start') || DEFAULTS.start,
+                end: params.get('end') || DEFAULTS.end
+            };
+        }
+
+        function parseDateLocal(dateString) {
+            if (!dateString) return null;
+            const parts = dateString.split('-');
+            if (parts.length !== 3) return null;
+            const d = new Date(parts[0], parts[1] - 1, parts[2]);
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+
+        function renderCalendar() {
+            const params = getParams();
+            document.getElementById('event-title').innerText = decodeURIComponent(params.title);
+
+            const startDate = parseDateLocal(params.start);
+            const endDate = parseDateLocal(params.end);
+
+            // Garantir que a data inicial seja menor ou igual à final
+            if (startDate && endDate && startDate > endDate) {
+                const temp = startDate.getTime();
+                startDate.setTime(endDate.getTime());
+                endDate.setTime(temp);
+            }
+
+            const startTimestamp = startDate ? startDate.getTime() : null;
+            const endTimestamp = endDate ? endDate.getTime() : null;
+
+            document.getElementById('month-year').innerText = `${monthNames[currentDisplayedMonth]} ${currentDisplayedYear}`;
+
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+
+            // Adiciona cabeçalho dos dias da semana
+            weekdays.forEach(day => {
+                const div = document.createElement('div');
+                div.className = 'weekday';
+                div.innerText = day;
+                grid.appendChild(div);
+            });
+
+            // Lógica do Calendário
+            const firstDay = new Date(currentDisplayedYear, currentDisplayedMonth, 1).getDay();
+            const daysInMonth = new Date(currentDisplayedYear, currentDisplayedMonth + 1, 0).getDate();
+
+            // Espaços vazios antes do primeiro dia
+            for (let i = 0; i < firstDay; i++) {
+                const emptyWrapper = document.createElement('div');
+                emptyWrapper.className = 'day-wrapper empty';
+                grid.appendChild(emptyWrapper);
+            }
+
+            // Preenche os dias
+            for (let i = 1; i <= daysInMonth; i++) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'day-wrapper';
+
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'day';
+                dayDiv.innerText = i;
+
+                const currentDayTimestamp = new Date(currentDisplayedYear, currentDisplayedMonth, i).getTime();
+                const dayOfWeek = new Date(currentDisplayedYear, currentDisplayedMonth, i).getDay();
+
+                if (startTimestamp && endTimestamp) {
+                    if (currentDayTimestamp === startTimestamp && currentDayTimestamp === endTimestamp) {
+                        wrapper.classList.add('range-single');
+                        dayDiv.classList.add('single-date');
+                    } else if (currentDayTimestamp === startTimestamp) {
+                        wrapper.classList.add('range-start');
+                        dayDiv.classList.add('start-date');
+                        if(dayOfWeek === 6) wrapper.style.borderTopRightRadius = '18px'; // Se começar no sábado, não vaza pra direita
+                    } else if (currentDayTimestamp === endTimestamp) {
+                        wrapper.classList.add('range-end');
+                        dayDiv.classList.add('end-date');
+                        if(dayOfWeek === 0) wrapper.style.borderTopLeftRadius = '18px'; // Se terminar no domingo, não vaza pra esquerda
+                    } else if (currentDayTimestamp > startTimestamp && currentDayTimestamp < endTimestamp) {
+                        wrapper.classList.add('range-mid');
+                        // Arredondar pontas se o intervalo passar por fins de semana
+                        if (dayOfWeek === 0) wrapper.classList.add('range-start');
+                        if (dayOfWeek === 6) wrapper.classList.add('range-end');
+                    }
+                }
+
+                wrapper.appendChild(dayDiv);
+                grid.appendChild(wrapper);
+            }
+        }
+
+        function updateParams() {
+            const p = getParams();
+            const newTitle = prompt("Nome do Evento (ex: Viagem a Paris):", p.title);
+            const newStart = prompt("Data Inicial (AAAA-MM-DD):", p.start);
+            const newEnd = prompt("Data Final (AAAA-MM-DD):", p.end);
+            
+            if (newTitle && newStart && newEnd) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('title', newTitle);
+                url.searchParams.set('start', newStart);
+                url.searchParams.set('end', newEnd);
+                window.location.href = url.toString();
+            }
+        }
+
+        // Navegação de meses
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            currentDisplayedMonth--;
+            if (currentDisplayedMonth < 0) {
+                currentDisplayedMonth = 11;
+                currentDisplayedYear--;
+            }
+            renderCalendar();
+        });
+
+        document.getElementById('next-btn').addEventListener('click', () => {
+            currentDisplayedMonth++;
+            if (currentDisplayedMonth > 11) {
+                currentDisplayedMonth = 0;
+                currentDisplayedYear++;
+            }
+            renderCalendar();
+        });
+
+        // Inicialização
+        window.onload = () => {
+            const params = getParams();
+            if(params.start) {
+                const startDate = parseDateLocal(params.start);
+                if(startDate) {
+                    currentDisplayedMonth = startDate.getMonth();
+                    currentDisplayedYear = startDate.getFullYear();
+                }
+            }
+            renderCalendar();
+        };
+    </script>
+</body>
+</html>
